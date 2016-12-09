@@ -110,9 +110,8 @@ class Heater:
 		self.state = self.relay.state()
 		self.last_reading = None
 
-		printlog('created heater')
-		printlog('policy', self.policy)
-		printlog('starting temperature: {} C'.format(self.tempsensor.poll()))
+		printlog('created heater control module')
+		printlog('with policy', self.policy)
 		statename = 'OFF'
 		if self.state:
 			statename = 'ON'
@@ -133,7 +132,7 @@ class Heater:
 			temp = self.tempsensor.poll()
 			if temp != self.last_reading:
 				self.last_reading = temp
-				printlog('temp: {} C'.format(temp))
+				printlog('temp change: {} C'.format(temp))
 			if self.policy.should_turn_on(temp):
 				self.set_state(True, temp)
 			elif self.policy.should_turn_off(temp):
@@ -168,6 +167,12 @@ def main():
 		limit_low = int(sys.argv[1])
 	if len(sys.argv) > 2:
 		limit_high = int(sys.argv[2])
+
+	if limit_low >= limit_high:
+		print('ERROR: turn-on temperature must be lower than turn-off temperature',
+		      file=sys.stderr)
+		sys.exit(1)
+
 	maintain_temp(limit_low, limit_high)
 
 
