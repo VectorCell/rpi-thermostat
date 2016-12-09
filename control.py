@@ -108,6 +108,7 @@ class Heater:
 		self.relay = Relay(relayname)
 		self.running = False
 		self.state = self.relay.state()
+		self.last_reading = None
 
 		printlog('created heater')
 		printlog('policy', self.policy)
@@ -130,7 +131,9 @@ class Heater:
 		self.running = True
 		while self.running:
 			temp = self.tempsensor.poll()
-			printlog('polling temp sensor: {} C'.format(temp))
+			if temp != self.last_reading:
+				self.last_reading = temp
+				printlog('temp: {} C'.format(temp))
 			if self.policy.should_turn_on(temp):
 				self.set_state(True, temp)
 			elif self.policy.should_turn_off(temp):
