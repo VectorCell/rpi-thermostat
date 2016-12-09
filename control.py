@@ -40,65 +40,131 @@ def run_command(cmd):
 	return output
 
 
-def get_temp_c():
-	user = getpass.getuser()
-	temp = run_command('/home/{}/bin/dht11_c'.format(user))
-	return int(temp)
+class Sensor:
+
+	def __init__(self, cmd, filterfn = None, typecast = int):
+		self.cmd = cmd
+		self.filterfn = filterfn
+		self.typecast = typecast
+
+	def poll(self):
+		val = run_command(self.cmd)
+		if self.filterfn:
+			val = self.filterfn(val)
+		if isinstance(val, self.typecast):
+			return val
+		else:
+			return self.typecast(val)
+
+
+class BangBangPolicy:
+
+	def __init__(self, limit_low, limit_high):
+		self.limit_low = limit_low
+		self.limit_high = limit_high
+
+	def should_turn_on(self, temp):
+		return temp <= self.limit_low
+
+	def should_turn_off(self, temp):
+		return temp >= self.limit_high
+
+	def __repr__(self):
+		return 'BangBangPolicy [{}-{}]'.format(
+			self.limit_low,
+			self.limit_high)
+
+
+class Relay:
+
+	def __init__(self, name):
+		self.name = name
+		self.user = getpass.getuser()
+
+	def toggle(self):
+		run_command('/home/{}/bin/relays toggle {}'.format(self.user, self.name))
+
+	def on(self):
+		run_command('/home/{}/bin/relays on {}'.format(self.user, self.name))
+
+	def off(self):
+		run_command('/home/{}/bin/relays off {}'.format(self.user, self.name))
+
+	def state(self):
+		return '1' == run_command('/home/{}/bin/relays state {}'.format(self.user, self.name))
+
+	def set_state(self, state):
+		if state:
+			self.on()
+		else:
+			self.off()
 
 
 class Heater:
 
-	def __init__(self):
-		self.state = False
+	def __init__(self, tempsensor, policy, relayname):
+		self.tempsensor = tempsensor
+		self.policy = policy
+		self.relay = Relay(relayname)
+		self.running = False
+		self.state = self.relay.state()
 
-	def update_relay(self, temp):
-		state_str = 'off'
+		printlog('created heater')
+		printlog('policy', self.policy)
+		printlog('starting temperature: {} C'.format(self.tempsensor.poll()))
+		statename = 'OFF'
 		if self.state:
-			state_str = 'on'
-		output = run_command('/home/{}/bin/relays {} {}'.format(
-			getpass.getuser(),
-			state_str,
-			'ext'))
-		if temp is not None:
-			printlog('temp is {} C, heater {}'.format(temp, state_str))
-		else:
-			printlog('ERROR: temp info not provided')
+			statename = 'ON'
+		printlog('initialized with heater {}'.format(statename))
 
 	def set_state(self, state, temp):
-		if self.state != state:
+		if state != self.state:
+			self.relay.set_state(state)
 			self.state = state
-			self.update_relay(temp)
+			if state:
+				printlog('temp is {} C, heater ON'.format(temp))
+			else:
+				printlog('temp is {} C, no change'.format(temp))
+
+	def start(self):
+		self.running = True
+		while self.running:
+			temp = self.tempsensor.poll()
+			if self.policy.should_turn_on(temp):
+				self.set_state(True, temp)
+			elif self.policy.should_turn_off(temp):
+				self.set_state(False, temp)
+			time.sleep(30)
+	
+	def stop(self):
+		self.running = False
 
 
-	def off(self, temp = None):
-		self.set_state(False, temp)
 
-	def on(self, temp = None):
-		self.set_state(True, temp)
+def maintain_temp(limit_low, limit_high):
 
+	user = getpass.getuser()
+	relayname = 'ext'
 
-def maintain_temp(goal, threshold = 2):
-	heater = Heater()
-	limit_low = goal - threshold
-	limit_high = goal + threshold
-	print('maintaining {} C ({} - {})'.format(goal,
-	                                          limit_low,
-	                                          limit_high))
-	while True:
-		temp = get_temp_c()
-		printlog('temp is {} C'.format(temp))
-		if temp <= limit_low:
-			heater.on(temp)
-		elif temp >= limit_high:
-			heater.off(temp)
-		time.sleep(30)
+	tempsensor = Sensor('/home/{}/bin/dht11_c'.format(user))
+	policy = BangBangPolicy(limit_low, limit_high)
+	heater = Heater(tempsensor, policy, relayname)
+
+	heater.start()
 
 
 
 def main():
 	signal.signal(signal.SIGINT, get_sighandler())
 	signal.signal(signal.SIGTERM, get_sighandler())
-	maintain_temp(23, 2)
+
+	limit_low = 25
+	limit_high = 27
+	if len(sys.argv) > 1:
+		goal = int(sys.argv[1])
+	if len(sys.argv) > 2:
+		threshold = int(sys.argv[2])
+	maintain_temp(limit_low, limit_high)
 
 
 if __name__ == '__main__':
