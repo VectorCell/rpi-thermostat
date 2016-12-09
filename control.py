@@ -124,7 +124,7 @@ class Heater:
 			if state:
 				printlog('temp is {} C, heater ON'.format(temp))
 			else:
-				printlog('temp is {} C, no change'.format(temp))
+				printlog('temp is {} C, heater OFF'.format(temp))
 
 	def start(self):
 		self.running = True
