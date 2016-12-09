@@ -130,6 +130,7 @@ class Heater:
 		self.running = True
 		while self.running:
 			temp = self.tempsensor.poll()
+			printlog('polling temp sensor: {} C'.format(temp))
 			if self.policy.should_turn_on(temp):
 				self.set_state(True, temp)
 			elif self.policy.should_turn_off(temp):
@@ -161,9 +162,9 @@ def main():
 	limit_low = 25
 	limit_high = 27
 	if len(sys.argv) > 1:
-		goal = int(sys.argv[1])
+		limit_low = int(sys.argv[1])
 	if len(sys.argv) > 2:
-		threshold = int(sys.argv[2])
+		limit_high = int(sys.argv[2])
 	maintain_temp(limit_low, limit_high)
 
 
