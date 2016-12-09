@@ -42,13 +42,18 @@ def run_command(cmd):
 
 class Sensor:
 
-	def __init__(self, cmd, filterfn = None, typecast = int):
+	def __init__(self, cmd, filterfn = None, typecast = int, poll_limit = 1):
 		self.cmd = cmd
 		self.filterfn = filterfn
 		self.typecast = typecast
+		self.poll_limit = poll_limit
+		self.last_poll = None
 
 	def poll(self):
+		if self.last_poll and time.time() < self.last_poll + self.poll_limit:
+			time.sleep((self.last_poll + self.poll_limit) - time.time())
 		val = run_command(self.cmd)
+		self.last_poll = time.time()
 		if self.filterfn:
 			val = self.filterfn(val)
 		if isinstance(val, self.typecast):
