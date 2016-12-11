@@ -7,6 +7,7 @@ import signal
 import getpass
 import time
 import string
+import abc
 
 
 def printlog(*t, **d):
@@ -43,6 +44,7 @@ def run_command(cmd):
 class Sensor:
 
 	def __init__(self, cmd, filterfn = None, typecast = int, poll_limit = 1):
+		assert(isinstance(typecast, type))
 		self.cmd = cmd
 		self.filterfn = filterfn
 		self.typecast = typecast
@@ -62,17 +64,29 @@ class Sensor:
 			return self.typecast(val)
 
 
-class BangBangPolicy:
+class Policy(metaclass=abc.ABCMeta):
+
+	@abc.abstractmethod
+	def should_turn_on(self, temp):
+		pass
+
+	@abc.abstractmethod
+	def should_turn_off(self, temp):
+		pass
+
+
+class BangBangPolicy(Policy):
 
 	def __init__(self, limit_low, limit_high):
+		assert(limit_low <= limit_high)
 		self.limit_low = limit_low
 		self.limit_high = limit_high
 
 	def should_turn_on(self, temp):
-		return temp <= self.limit_low
+		return temp < self.limit_low
 
 	def should_turn_off(self, temp):
-		return temp >= self.limit_high
+		return temp > self.limit_high
 
 	def __repr__(self):
 		return 'BangBangPolicy [{}-{}]'.format(
@@ -166,14 +180,18 @@ def main():
 	signal.signal(signal.SIGINT, get_sighandler())
 	signal.signal(signal.SIGTERM, get_sighandler())
 
-	limit_low = 25
-	limit_high = 27
 	if len(sys.argv) > 1:
 		limit_low = int(sys.argv[1])
+	else:
+		print('ERROR: must provide target temperature (or temperature range)',
+		      file=sys.stderr)
+		sys.exit(1)
 	if len(sys.argv) > 2:
 		limit_high = int(sys.argv[2])
+	else:
+		limit_high = limit_low
 
-	if limit_low >= limit_high:
+	if limit_low > limit_high:
 		print('ERROR: turn-on temperature must be lower than turn-off temperature',
 		      file=sys.stderr)
 		sys.exit(1)
