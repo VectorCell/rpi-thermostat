@@ -130,7 +130,7 @@ class Heater:
 		self.last_reading = None
 
 		printlog('created heater control module')
-		printlog('with policy', self.policy)
+		printlog('using policy', self.policy)
 		statename = 'OFF'
 		if self.state:
 			statename = 'ON'
