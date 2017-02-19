@@ -166,7 +166,7 @@ class Heater:
 def maintain_temp(limit_low, limit_high):
 
 	user = getpass.getuser()
-	relayname = 'ext'
+	relayname = 'bed'
 
 	tempsensor = Sensor('/home/{}/bin/mcp9808_c'.format(user), typecast=float)
 	policy = BangBangPolicy(limit_low, limit_high)
